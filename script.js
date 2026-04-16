@@ -350,6 +350,13 @@ function applyAuthState() {
   if (currentUser) {
     authShell.classList.remove("visible");
     accountEmail.textContent = getPreferredName() || "Signed in";
+    if (isMobileLike()) {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        if (mobileSections) mobileSections.scrollLeft = 0;
+        syncMobileNav("calendar-panel");
+      });
+    }
     return;
   }
   authShell.classList.add("visible");
@@ -533,7 +540,7 @@ function renderCalendar() {
 function renderSelectedDay() {
   const entry = getCurrentEntry();
   const date = fromDateKey(selectedDateKey);
-  selectedDateLabel.textContent = date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  selectedDateLabel.textContent = date.toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" });
   entryTitleInput.value = entry.title || "";
   richEditor.innerHTML = entry.content || "";
   richEditor.dataset.placeholder = notePrompts[Math.floor(Math.random() * notePrompts.length)];
@@ -1061,7 +1068,7 @@ function renderCalendarDayDetail() {
   const stickerMood = (entry.stickers || []).length ? entry.stickers.join(" ") : "No sticker mood yet.";
 
   calendarDayDetail.innerHTML = `
-    <h3>${date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</h3>
+    <h3>${date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</h3>
     <div class="day-task-list">
       ${
         tasks.length
