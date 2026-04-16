@@ -18,13 +18,16 @@
       <div class="auth-card">
         <p class="eyebrow">Bloomboard Account</p>
         <h1 class="auth-title">Your private little universe</h1>
-        <p class="hero-message">Create an account or sign in so your journal stays private and syncs across devices.</p>
+        <p class="hero-message">Create a new account or sign in to continue.</p>
         <div class="auth-form">
+          <label class="input-label auth-label" for="auth-email">Email</label>
           <input id="auth-email" class="soft-input" type="email" placeholder="Email address" autocomplete="email" />
+          <label class="input-label auth-label" for="auth-password">Password</label>
           <input id="auth-password" class="soft-input" type="password" placeholder="Password" autocomplete="current-password" />
+          <p class="auth-helper">New to Bloomboard? Create Account. Already have an account? Sign In.</p>
           <div class="auth-actions">
-            <button id="sign-in-button" class="cta-button small-cta" type="button">Sign In</button>
-            <button id="sign-up-button" class="soft-button auth-secondary-button" type="button">Create Account</button>
+            <button id="sign-up-button" class="cta-button small-cta" type="button">Create Account</button>
+            <button id="sign-in-button" class="soft-button auth-secondary-button" type="button">Sign In</button>
           </div>
           <p id="auth-message" class="canvas-help"></p>
         </div>
