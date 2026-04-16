@@ -28,6 +28,8 @@
         <h1 class="auth-title">Your private little universe</h1>
         <p class="hero-message">Create a new account or sign in to continue.</p>
         <div class="auth-form">
+          <label class="input-label auth-label" for="auth-preferred-name">Preferred name</label>
+          <input id="auth-preferred-name" class="soft-input" type="text" placeholder="What should Lumi call you?" autocomplete="nickname" />
           <label class="input-label auth-label" for="auth-email">Email</label>
           <input id="auth-email" class="soft-input" type="email" placeholder="Email address" autocomplete="email" />
           <label class="input-label auth-label" for="auth-password">Password</label>
@@ -46,6 +48,7 @@
         <div class="hero-copy">
           <p class="eyebrow">Lumi</p>
           <h1>A quiet corner for your little universe.</h1>
+          <p id="hero-greeting" class="hero-greeting">Hello there.</p>
           <p class="hero-message" id="hero-message">Today's quote will appear here.</p>
           <div class="hero-actions hero-actions-wide">
             <button id="jump-today" class="soft-button soft-button-secondary">Open Today</button>
