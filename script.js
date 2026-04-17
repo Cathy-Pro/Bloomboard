@@ -11,18 +11,23 @@ const inspirations = [
 const notePrompts = [
   "Whisper something to your universe...",
   "Add a little spark to your galaxy...",
-  "What’s blooming in your world today?"
+  "What’s blooming in your world today?",
 ];
 
-const moods = [
-  { id: "calm", icon: "🌿", label: "Calm" },
-  { id: "hopeful", icon: "🌞", label: "Hopeful" },
-  { id: "soft", icon: "☁️", label: "Soft" },
-  { id: "energized", icon: "✨", label: "Energized" },
-  { id: "reflective", icon: "📖", label: "Reflective" },
+const moodRangeSteps = [
+  { emoji: "😞", label: "Sad" },
+  { emoji: "😐", label: "Neutral" },
+  { emoji: "😊", label: "Happy" },
+  { emoji: "🤩", label: "Excited" },
 ];
 
-const stickers = ["🌷", "🌈", "🫖", "🍓", "🕊️", "⭐", "🍀", "🪴", "💌", "🎧"];
+const completionMessages = [
+  "A tiny win for today. You’re doing beautifully.",
+  "Done and glowing. Keep going softly.",
+  "A sweet little checkmark for your universe.",
+  "You showed up for yourself today.",
+];
+
 const tagMeta = {
   Health: { icon: "🫀", className: "tag-health" },
   Wellbeing: { icon: "🌼", className: "tag-wellbeing" },
@@ -33,9 +38,7 @@ const tagMeta = {
 };
 
 const defaultData = {
-  profile: {
-    preferredName: "",
-  },
+  profile: { preferredName: "" },
   tasks: [
     {
       id: crypto.randomUUID(),
@@ -72,7 +75,6 @@ let state = structuredClone(defaultData);
 let viewingDate = new Date();
 let selectedDateKey = toDateKey(new Date());
 let inspirationIndex = Math.floor(Math.random() * inspirations.length);
-let activeMood = null;
 let draggedTaskId = null;
 let dragGhost = null;
 let highlightedDateKey = null;
@@ -99,11 +101,12 @@ const calendarDayDetail = document.getElementById("calendar-day-detail");
 const selectedDateLabel = document.getElementById("selected-date-label");
 const heroGreeting = document.getElementById("hero-greeting");
 const heroMessage = document.getElementById("hero-message");
-const moodStrip = document.getElementById("mood-strip");
-const entryTitleInput = document.getElementById("entry-title");
+const moodRange = document.getElementById("mood-range");
+const moodRangeEmoji = document.getElementById("mood-range-emoji");
+const moodRangeValue = document.getElementById("mood-range-value");
+const hydrationRange = document.getElementById("hydration-range");
+const hydrationRangeValue = document.getElementById("hydration-range-value");
 const richEditor = document.getElementById("rich-editor");
-const stickerPicker = document.getElementById("sticker-picker");
-const selectedStickers = document.getElementById("selected-stickers");
 const dayTaskList = document.getElementById("day-task-list");
 const taskDrawer = document.getElementById("task-drawer");
 const toggleDrawerButton = document.getElementById("toggle-drawer");
@@ -125,8 +128,6 @@ async function boot() {
   initializeClient();
   wireGlobalEvents();
   renderInspiration();
-  renderMoodStrip();
-  renderStickerPicker();
   renderApp();
 
   if (!cloudReady) {
@@ -137,9 +138,7 @@ async function boot() {
   }
 
   const { data, error } = await supabaseClient.auth.getSession();
-  if (error) {
-    authMessage.textContent = error.message;
-  }
+  if (error) authMessage.textContent = error.message;
   currentUser = data?.session?.user || null;
   await loadUserState();
   applyAuthState();
@@ -201,16 +200,7 @@ function wireGlobalEvents() {
     const entry = getCurrentEntry();
     entry.title = "";
     entry.content = "";
-    entry.mood = null;
-    entry.stickers = [];
-    activeMood = null;
-    await persist();
-    renderCalendar();
-    renderSelectedDay();
-  });
-
-  document.getElementById("clear-stickers").addEventListener("click", async () => {
-    getCurrentEntry().stickers = [];
+    entry.wellbeing = getEmptyWellbeing();
     await persist();
     renderCalendar();
     renderSelectedDay();
@@ -238,38 +228,32 @@ function wireGlobalEvents() {
     syncDrawerButton();
   });
   taskSearch.addEventListener("input", renderTasks);
-
   document.getElementById("task-title").addEventListener("keydown", (event) => {
     if (event.key === "Enter") addTask();
   });
 
-  entryTitleInput.addEventListener("input", queueSave);
   richEditor.addEventListener("input", queueSave);
+  moodRange.addEventListener("input", handleWellbeingInput);
+  hydrationRange.addEventListener("input", handleWellbeingInput);
 
   document.addEventListener("mousemove", (event) => {
     cursorAura.style.left = `${event.clientX}px`;
     cursorAura.style.top = `${event.clientY}px`;
     updatePointerDrag(event.clientX, event.clientY);
   });
-
   document.addEventListener("mousedown", () => {
     cursorAura.style.transform = "translate(-50%, -50%) scale(0.8)";
   });
-
   document.addEventListener("mouseup", () => {
     cursorAura.style.transform = "translate(-50%, -50%) scale(1)";
     finishPointerDrag();
   });
-
   document.addEventListener("touchmove", (event) => {
     const touch = event.touches[0];
     if (!touch) return;
     updatePointerDrag(touch.clientX, touch.clientY);
   }, { passive: true });
-
-  document.addEventListener("touchend", () => {
-    finishPointerDrag();
-  });
+  document.addEventListener("touchend", finishPointerDrag);
 
   mobileNavButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -303,40 +287,29 @@ async function handleAuth(mode) {
       ? await supabaseClient.auth.signUp({
           email,
           password,
-          options: {
-            data: {
-              preferred_name: preferredName || "",
-            },
-          },
+          options: { data: { preferred_name: preferredName || "" } },
         })
       : await supabaseClient.auth.signInWithPassword({ email, password });
+
     if (!error && preferredName) {
-      state.profile = {
-        ...(state.profile || {}),
-        preferredName,
-      };
+      state.profile.preferredName = preferredName;
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizeState(state)));
     }
     if (!error && mode === "sign-in" && preferredName) {
-      const { data: updatedUserData, error: updateUserError } = await supabaseClient.auth.updateUser({
-        data: {
-          preferred_name: preferredName,
-        },
-      });
-      if (!updateUserError && updatedUserData?.user) {
-        currentUser = updatedUserData.user;
-      }
+      const { data: updatedUserData } = await supabaseClient.auth.updateUser({ data: { preferred_name: preferredName } });
+      if (updatedUserData?.user) currentUser = updatedUserData.user;
     } else if (!error && data?.user) {
       currentUser = data.user;
     }
+
     authMessage.textContent = error
       ? error.message
       : mode === "sign-up"
         ? "Account created. Check your email if confirmation is enabled, then sign in."
         : "Signed in.";
   } catch (error) {
-    authMessage.textContent = "Unable to reach Supabase. Check your project URL/key, internet connection, and try serving the site from a local web server instead of opening the HTML file directly.";
-    console.error("Auth request failed", error);
+    authMessage.textContent = "Unable to reach Supabase. Check your project URL/key and try again.";
+    console.error(error);
   }
 }
 
@@ -353,8 +326,7 @@ function applyAuthState() {
     if (isMobileLike()) {
       window.requestAnimationFrame(() => {
         window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-        if (mobileSections) mobileSections.scrollLeft = 0;
-        syncMobileNav("calendar-panel");
+        ensureMobileCalendarLanding();
       });
     }
     return;
@@ -371,11 +343,7 @@ async function loadUserState() {
     return;
   }
 
-  const { data, error } = await supabaseClient
-    .from(CLOUD_TABLE)
-    .select("app_state")
-    .eq("user_id", currentUser.id)
-    .maybeSingle();
+  const { data, error } = await supabaseClient.from(CLOUD_TABLE).select("app_state").eq("user_id", currentUser.id).maybeSingle();
 
   if (error) {
     authMessage.textContent = `Cloud load failed: ${error.message}`;
@@ -388,80 +356,32 @@ async function loadUserState() {
   }
 
   const authPreferredName = currentUser?.user_metadata?.preferred_name || "";
-  let shouldBackfillProfile = false;
-  if (!state.profile?.preferredName && authPreferredName) {
-    state.profile = {
-      ...(state.profile || {}),
-      preferredName: authPreferredName,
-    };
-    shouldBackfillProfile = true;
+  if (!state.profile.preferredName && authPreferredName) {
+    state.profile.preferredName = authPreferredName;
+    await saveCloudState();
   }
 
   normalizeTasks();
-  if (shouldBackfillProfile) {
-    await saveCloudState();
-  }
   renderApp();
 }
 
 function renderApp() {
   selectedDateKey = selectedDateKey || toDateKey(new Date());
   viewingDate = viewingDate || new Date();
-  if (!hasRenderedApp) {
-    hasRenderedApp = true;
-  }
+  if (!hasRenderedApp) hasRenderedApp = true;
   renderInspiration();
-  renderMoodStrip();
-  renderStickerPicker();
   renderCalendar();
   renderSelectedDay();
   renderTasks();
   renderTracker();
   syncDrawerButton();
   updateGreeting();
+  ensureMobileCalendarLanding();
 }
 
 function renderInspiration() {
   const item = inspirations[inspirationIndex % inspirations.length];
   heroMessage.textContent = `Today's quote: ${item.text}  •  ${item.source}`;
-}
-
-function renderMoodStrip() {
-  moodStrip.innerHTML = "";
-  moods.forEach((mood) => {
-    const button = document.createElement("button");
-    button.className = `mood-chip${activeMood === mood.id ? " active" : ""}`;
-    button.type = "button";
-    button.textContent = `${mood.icon} ${mood.label}`;
-    button.addEventListener("click", async () => {
-      activeMood = mood.id;
-      getCurrentEntry().mood = activeMood;
-      await persist();
-      renderMoodStrip();
-      celebrate("Mood updated", 540, false);
-    });
-    moodStrip.appendChild(button);
-  });
-}
-
-function renderStickerPicker() {
-  stickerPicker.innerHTML = "";
-  stickers.forEach((sticker) => {
-    const button = document.createElement("button");
-    button.className = "sticker-chip";
-    button.type = "button";
-    button.textContent = sticker;
-    button.addEventListener("click", async () => {
-      const entry = getCurrentEntry();
-      entry.stickers = entry.stickers || [];
-      entry.stickers.push(sticker);
-      await persist();
-      renderCalendar();
-      renderSelectedDay();
-      celebrate("Sticker added", 540, false);
-    });
-    stickerPicker.appendChild(button);
-  });
 }
 
 function renderCalendar() {
@@ -495,6 +415,8 @@ function renderCalendar() {
     const key = toDateKey(cellDate);
     const entry = state.entries[key] || {};
     const dayTasks = getTasksForDate(key);
+    const modeEmoji = entry?.wellbeing ? moodRangeSteps[normalizeWellbeing(entry.wellbeing).moodIndex].emoji : "";
+
     const dayButton = document.createElement("button");
     dayButton.type = "button";
     dayButton.className = "calendar-day";
@@ -502,16 +424,15 @@ function renderCalendar() {
     if (muted) dayButton.classList.add("muted");
     if (key === todayKey) dayButton.classList.add("today");
     if (key === selectedDateKey) dayButton.classList.add("selected");
-    if (dayTasks.length || (entry.stickers || []).length) dayButton.classList.add("has-entry");
+    if (dayTasks.length || modeEmoji) dayButton.classList.add("has-entry");
 
-    const stickerHtml = (entry.stickers || []).slice(0, 3).map((sticker) => `<span>${sticker}</span>`).join("");
     const taskHtml = dayTasks.length
       ? dayTasks.slice(0, 3).map((task) => `<span class="calendar-task-pill${isTaskDoneOnDate(task, key) ? " done" : ""}">${escapeHtml(task.title)}</span>`).join("")
       : `<span class="calendar-empty"></span>`;
 
     dayButton.innerHTML = `
       <div class="day-number">${cellDate.getDate()}</div>
-      <div class="calendar-stickers">${stickerHtml}</div>
+      <div class="calendar-stickers">${modeEmoji ? `<span>${modeEmoji}</span>` : ""}</div>
       <div class="calendar-task-stack">${taskHtml}</div>
     `;
 
@@ -541,34 +462,9 @@ function renderSelectedDay() {
   const entry = getCurrentEntry();
   const date = fromDateKey(selectedDateKey);
   selectedDateLabel.textContent = date.toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" });
-  entryTitleInput.value = entry.title || "";
   richEditor.innerHTML = entry.content || "";
   richEditor.dataset.placeholder = notePrompts[Math.floor(Math.random() * notePrompts.length)];
-  activeMood = entry.mood || null;
-  renderMoodStrip();
-
-  selectedStickers.innerHTML = "";
-  const stickerList = entry.stickers || [];
-  if (!stickerList.length) {
-    const empty = document.createElement("div");
-    empty.className = "selected-sticker";
-    empty.textContent = "No sticker picked for today yet.";
-    selectedStickers.appendChild(empty);
-  }
-
-  stickerList.forEach((sticker, index) => {
-    const chip = document.createElement("button");
-    chip.className = "selected-sticker";
-    chip.type = "button";
-    chip.textContent = `${sticker} remove`;
-    chip.addEventListener("click", async () => {
-      entry.stickers.splice(index, 1);
-      await persist();
-      renderCalendar();
-      renderSelectedDay();
-    });
-    selectedStickers.appendChild(chip);
-  });
+  renderWellbeing(entry.wellbeing);
 
   dayTaskList.innerHTML = "";
   const assignedTasks = getTasksForDate(selectedDateKey);
@@ -577,6 +473,7 @@ function renderSelectedDay() {
     emptyPill.className = "day-task-pill";
     emptyPill.textContent = "No tasks assigned to this day yet.";
     dayTaskList.appendChild(emptyPill);
+    renderCalendarDayDetail();
     return;
   }
 
@@ -592,7 +489,7 @@ function renderSelectedDay() {
       renderSelectedDay();
       renderTasks();
       renderTracker();
-      celebrate(isTaskDoneOnDate(task, selectedDateKey) ? "Task completed" : "Task reopened");
+      celebrate(isTaskDoneOnDate(task, selectedDateKey) ? getCompletionMessage() : "Task reopened");
     });
     dayTaskList.appendChild(pill);
   });
@@ -631,7 +528,7 @@ function renderTasks() {
       renderSelectedDay();
       renderTasks();
       renderTracker();
-      celebrate(checkbox.checked ? "Task completed" : "Task reopened");
+      celebrate(checkbox.checked ? getCompletionMessage() : "Task reopened");
     });
 
     const actions = document.createElement("div");
@@ -689,6 +586,7 @@ function renderTasks() {
     const startPickup = (clientX, clientY) => {
       draggedTaskId = task.id;
       card.classList.add("dragging");
+      document.body.classList.add("drag-active");
       createDragGhost(task.title, clientX, clientY);
       celebrate("Picked up task", 500, false);
     };
@@ -696,6 +594,7 @@ function renderTasks() {
     card.addEventListener("mousedown", (event) => {
       if (event.target.closest("button, input, label")) return;
       if (isMobileLike()) return;
+      event.preventDefault();
       startPickup(event.clientX, event.clientY);
     });
 
@@ -704,11 +603,7 @@ function renderTasks() {
       if (!isMobileLike()) return;
       selectedTaskForMobile = selectedTaskForMobile === task.id ? null : task.id;
       renderTasks();
-      celebrate(
-        selectedTaskForMobile ? `Selected "${task.title}". Tap a date to assign it.` : "Selection cleared",
-        1200,
-        false
-      );
+      celebrate(selectedTaskForMobile ? `Selected \"${task.title}\". Tap a date to assign it.` : "Selection cleared", 1200, false);
       syncMobileNav("calendar-panel");
     });
 
@@ -758,13 +653,18 @@ function renderTracker() {
   });
 }
 
-async function addTask() {
+function addTask() {
   const titleInput = document.getElementById("task-title");
   const tagInput = document.getElementById("task-tag");
   const targetDateInput = document.getElementById("task-target-date");
   const detailInput = document.getElementById("task-detail");
+
   const title = titleInput.value.trim();
-  if (!title || !tagInput.value) {
+  const tag = tagInput.value;
+  const targetDate = targetDateInput.value || null;
+  const detail = detailInput.value.trim();
+
+  if (!title || !tag) {
     celebrate("Add a title and choose a category first.", 1200, false);
     return;
   }
@@ -772,9 +672,9 @@ async function addTask() {
   state.tasks.unshift({
     id: crypto.randomUUID(),
     title,
-    tag: tagInput.value,
-    targetDate: targetDateInput.value || null,
-    detail: detailInput.value.trim(),
+    tag,
+    targetDate,
+    detail,
     assignedDates: [],
     completedDates: [],
   });
@@ -783,24 +683,12 @@ async function addTask() {
   tagInput.value = "";
   targetDateInput.value = "";
   detailInput.value = "";
-  await persist();
-  renderTasks();
-  renderTracker();
-  celebrate("Task added");
-}
 
-function queueSave() {
-  window.clearTimeout(saveTimeoutId);
-  saveTimeoutId = window.setTimeout(async () => {
-    writeCurrentEditorToState();
-    await persist();
-    renderCalendar();
-  }, 180);
-}
-
-function assignDraggedTaskToDate(dateKey) {
-  if (!draggedTaskId) return;
-  assignTaskToDate(draggedTaskId, dateKey);
+  persist().then(() => {
+    renderTasks();
+    renderTracker();
+    celebrate("Task added");
+  });
 }
 
 async function assignTaskToDate(taskId, dateKey) {
@@ -808,13 +696,11 @@ async function assignTaskToDate(taskId, dateKey) {
   if (!task) return;
   if (!task.assignedDates.includes(dateKey)) {
     task.assignedDates.push(dateKey);
+    task.assignedDates.sort();
   }
   selectedDateKey = dateKey;
-  draggedTaskId = null;
-  selectedTaskForMobile = null;
-  clearDropTarget();
-  removeDragGhost();
   await persist();
+  clearDropTarget();
   renderCalendar();
   renderSelectedDay();
   renderTasks();
@@ -822,16 +708,13 @@ async function assignTaskToDate(taskId, dateKey) {
   celebrate("Task tucked into the calendar");
 }
 
-function getTasksForDate(dateKey) {
-  return state.tasks.filter((task) => task.assignedDates.includes(dateKey));
-}
-
 function setTaskDoneOnDate(task, dateKey, done) {
   if (done) {
     if (!task.completedDates.includes(dateKey)) task.completedDates.push(dateKey);
-    return;
+  } else {
+    task.completedDates = task.completedDates.filter((item) => item !== dateKey);
   }
-  task.completedDates = task.completedDates.filter((item) => item !== dateKey);
+  task.completedDates.sort();
 }
 
 function toggleTaskOnDate(task, dateKey) {
@@ -852,15 +735,14 @@ function getTaskTrackerStats(task) {
 
 function writeCurrentEditorToState() {
   const entry = getCurrentEntry();
-  entry.title = entryTitleInput.value.trim();
   entry.content = richEditor.innerHTML.trim();
-  entry.mood = activeMood;
 }
 
 function getCurrentEntry() {
   if (!state.entries[selectedDateKey]) {
-    state.entries[selectedDateKey] = { title: "", content: "", mood: null, stickers: [] };
+    state.entries[selectedDateKey] = { content: "", wellbeing: getEmptyWellbeing() };
   }
+  state.entries[selectedDateKey].wellbeing = normalizeWellbeing(state.entries[selectedDateKey].wellbeing);
   return state.entries[selectedDateKey];
 }
 
@@ -872,9 +754,7 @@ async function persist() {
   const cleanState = sanitizeState(state);
   state = cleanState;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanState));
-  if (currentUser && cloudReady) {
-    await saveCloudState();
-  }
+  if (currentUser && cloudReady) await saveCloudState();
 }
 
 async function saveCloudState() {
@@ -883,9 +763,7 @@ async function saveCloudState() {
     app_state: sanitizeState(state),
     updated_at: new Date().toISOString(),
   });
-  if (error) {
-    authMessage.textContent = `Cloud save failed: ${error.message}`;
-  }
+  if (error) authMessage.textContent = `Cloud save failed: ${error.message}`;
 }
 
 function loadLocalCache() {
@@ -893,29 +771,37 @@ function loadLocalCache() {
     const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY));
     if (saved?.tasks && saved?.entries) return sanitizeState(saved);
   } catch (error) {
-    console.warn("Unable to load saved journal state", error);
+    console.warn(error);
   }
   return structuredClone(defaultData);
 }
 
 function sanitizeState(candidate) {
   const next = {
-    profile: candidate?.profile && typeof candidate.profile === "object"
-      ? {
-          preferredName: candidate.profile.preferredName || "",
-        }
-      : { preferredName: "" },
-    tasks: Array.isArray(candidate?.tasks) ? candidate.tasks.map((task) => ({
-      id: task.id || crypto.randomUUID(),
-      title: task.title || "",
-      tag: task.tag || "Health",
-      targetDate: task.targetDate || null,
-      detail: task.detail || "",
-      assignedDates: Array.isArray(task.assignedDates) ? task.assignedDates : [],
-      completedDates: Array.isArray(task.completedDates) ? task.completedDates : [],
-    })) : structuredClone(defaultData.tasks),
-    entries: candidate?.entries && typeof candidate.entries === "object" ? candidate.entries : {},
+    profile: candidate?.profile && typeof candidate.profile === "object" ? { preferredName: candidate.profile.preferredName || "" } : { preferredName: "" },
+    tasks: Array.isArray(candidate?.tasks)
+      ? candidate.tasks.map((task) => ({
+          id: task.id || crypto.randomUUID(),
+          title: task.title || "",
+          tag: task.tag || "Health",
+          targetDate: task.targetDate || null,
+          detail: task.detail || "",
+          assignedDates: Array.isArray(task.assignedDates) ? task.assignedDates : [],
+          completedDates: Array.isArray(task.completedDates) ? task.completedDates : [],
+        }))
+      : structuredClone(defaultData.tasks),
+    entries: {},
   };
+
+  if (candidate?.entries && typeof candidate.entries === "object") {
+    Object.entries(candidate.entries).forEach(([dateKey, entry]) => {
+      next.entries[dateKey] = {
+        content: entry?.content || "",
+        wellbeing: normalizeWellbeing(entry?.wellbeing),
+      };
+    });
+  }
+
   return next;
 }
 
@@ -945,10 +831,8 @@ function renderTagBadge(tag) {
 function celebrate(message, duration = 1200, playSound = true) {
   feedbackBubble.textContent = message;
   feedbackBubble.classList.add("visible");
-  window.clearTimeout(celebrate.timeoutId);
-  celebrate.timeoutId = window.setTimeout(() => {
-    feedbackBubble.classList.remove("visible");
-  }, duration);
+  clearTimeout(celebrate.timeoutId);
+  celebrate.timeoutId = window.setTimeout(() => feedbackBubble.classList.remove("visible"), duration);
   if (playSound) playChime();
 }
 
@@ -977,17 +861,15 @@ function createDragGhost(title, clientX, clientY) {
   removeDragGhost();
   dragGhost = document.createElement("div");
   dragGhost.className = "drag-ghost";
-  dragGhost.textContent = `✦ Drag "${title}" to a date`;
+  dragGhost.textContent = `✦ Drag \"${title}\" to a date`;
   document.body.appendChild(dragGhost);
   positionDragGhost(clientX, clientY);
 }
-
 function positionDragGhost(clientX, clientY) {
   if (!dragGhost) return;
   dragGhost.style.left = `${clientX}px`;
   dragGhost.style.top = `${clientY - 14}px`;
 }
-
 function updatePointerDrag(clientX, clientY) {
   if (!draggedTaskId) return;
   positionDragGhost(clientX, clientY);
@@ -998,7 +880,6 @@ function updatePointerDrag(clientX, clientY) {
   highlightedDateKey = nextDateKey;
   renderCalendar();
 }
-
 function finishPointerDrag() {
   if (!draggedTaskId) return;
   const taskId = draggedTaskId;
@@ -1006,6 +887,8 @@ function finishPointerDrag() {
   const draggingCard = taskDrawer.querySelector(`[data-id="${taskId}"]`);
   if (draggingCard) draggingCard.classList.remove("dragging");
   draggedTaskId = null;
+  document.body.classList.remove("drag-active");
+  window.getSelection?.()?.removeAllRanges?.();
   removeDragGhost();
   if (dropDateKey) {
     assignTaskToDate(taskId, dropDateKey);
@@ -1013,92 +896,112 @@ function finishPointerDrag() {
   }
   clearDropTarget();
 }
-
 function clearDropTarget() {
   highlightedDateKey = null;
+  document.body.classList.remove("drag-active");
   renderCalendar();
 }
-
 function removeDragGhost() {
   if (!dragGhost) return;
   dragGhost.remove();
   dragGhost = null;
 }
 
-function normalizeTasks() {
-  state.profile = {
-    preferredName: state?.profile?.preferredName || "",
+function getEmptyWellbeing() {
+  return { moodIndex: null, hydration: null };
+}
+function normalizeWellbeing(candidate) {
+  return {
+    moodIndex: Number.isFinite(candidate?.moodIndex) ? Math.max(0, Math.min(3, Number(candidate.moodIndex))) : null,
+    hydration: normalizePercent(candidate?.hydration, null),
   };
-  state.tasks.forEach((task) => {
-    task.targetDate = task.targetDate || null;
-    task.assignedDates = Array.isArray(task.assignedDates) ? task.assignedDates : [];
-    task.completedDates = Array.isArray(task.completedDates) ? task.completedDates : [];
-    if (typeof task.completed === "boolean") {
-      task.completedDates = task.completed ? [...task.assignedDates] : [];
-      delete task.completed;
-    }
-    if ("kind" in task) delete task.kind;
-  });
+}
+function normalizePercent(value, fallback = 50) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+function renderWellbeing(wellbeing = getEmptyWellbeing()) {
+  const normalized = normalizeWellbeing(wellbeing);
+  const moodStep = Number.isInteger(normalized.moodIndex) ? moodRangeSteps[normalized.moodIndex] : null;
+  moodRange.value = String(Number.isInteger(normalized.moodIndex) ? normalized.moodIndex : 1);
+  moodRangeEmoji.textContent = moodStep ? moodStep.emoji : "○";
+  moodRangeValue.textContent = moodStep ? moodStep.label : "Not set";
+  hydrationRange.value = String(Number.isFinite(normalized.hydration) ? normalized.hydration : 50);
+  hydrationRangeValue.textContent = Number.isFinite(normalized.hydration) ? `💧 ${normalized.hydration}%` : "💧 Not set";
+}
+function handleWellbeingInput() {
+  const entry = getCurrentEntry();
+  entry.wellbeing = normalizeWellbeing({ moodIndex: Number(moodRange.value), hydration: Number(hydrationRange.value) });
+  renderWellbeing(entry.wellbeing);
+  renderCalendar();
+  renderCalendarDayDetail();
+  queueSave();
 }
 
 function getPreferredName() {
   return state?.profile?.preferredName || currentUser?.user_metadata?.preferred_name || "";
 }
-
 function updateGreeting() {
-  if (!heroGreeting) return;
   const preferredName = getPreferredName();
   heroGreeting.textContent = preferredName ? `Hello, ${preferredName}.` : "Hello there.";
 }
-
-function formatTargetDate(dateKey) {
-  return fromDateKey(dateKey).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
+function getCompletionMessage() {
+  return completionMessages[Math.floor(Math.random() * completionMessages.length)];
+}
+function normalizeTasks() {
+  state.profile = { preferredName: state?.profile?.preferredName || "" };
+  state.tasks.forEach((task) => {
+    task.targetDate = task.targetDate || null;
+    task.assignedDates = Array.isArray(task.assignedDates) ? task.assignedDates : [];
+    task.completedDates = Array.isArray(task.completedDates) ? task.completedDates : [];
   });
 }
-
+function formatTargetDate(dateKey) {
+  return fromDateKey(dateKey).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
 function renderCalendarDayDetail() {
   if (!calendarDayDetail) return;
   const entry = getCurrentEntry();
   const date = fromDateKey(selectedDateKey);
   const tasks = getTasksForDate(selectedDateKey);
-  const spark = entry.title || stripHtml(entry.content || "") || "Nothing added yet. Tap a task or note to begin.";
-  const stickerMood = (entry.stickers || []).length ? entry.stickers.join(" ") : "No sticker mood yet.";
+  const spark = stripHtml(entry.content || "") || "Nothing added yet. Tap a task or note to begin.";
+  const wellbeing = normalizeWellbeing(entry.wellbeing);
+  const modeCopy = Number.isInteger(wellbeing.moodIndex) ? moodRangeSteps[wellbeing.moodIndex].emoji : "Not set";
+  const hydrationCopy = Number.isFinite(wellbeing.hydration) ? `💧 ${wellbeing.hydration}%` : "💧 Not set";
 
   calendarDayDetail.innerHTML = `
     <h3>${date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</h3>
-    <div class="day-task-list">
+    <div class="calendar-day-detail-tasks">
       ${
         tasks.length
           ? tasks
-              .map((task) => `<span class="day-task-pill">${isTaskDoneOnDate(task, selectedDateKey) ? "✅" : "🪄"} ${escapeHtml(task.title)}</span>`)
+              .map((task) => `
+                <article class="calendar-day-detail-task">
+                  <strong>${isTaskDoneOnDate(task, selectedDateKey) ? "✅" : "🪄"} ${escapeHtml(task.title)}</strong>
+                  <p>${escapeHtml(task.detail || "A soft little step for this day.")}</p>
+                </article>
+              `)
               .join("")
-          : '<span class="day-task-pill">No tasks set for this day yet.</span>'
+          : '<article class="calendar-day-detail-task"><strong>No tasks set for this day yet.</strong><p>Pick something from the drawer and drop it onto this date.</p></article>'
       }
     </div>
     <p class="calendar-day-detail-copy"><strong>Little spark:</strong> ${escapeHtml(spark)}</p>
-    <p class="calendar-day-detail-copy"><strong>Sticker mood:</strong> ${escapeHtml(stickerMood)}</p>
+    <p class="calendar-day-detail-copy"><strong>Today’s mode:</strong> ${modeCopy}</p>
+    <p class="calendar-day-detail-copy"><strong>Hydration:</strong> ${hydrationCopy}</p>
   `;
 }
-
 function stripHtml(html) {
   const temp = document.createElement("div");
   temp.innerHTML = html;
   return (temp.textContent || "").trim();
 }
-
 function isMobileLike() {
   return window.matchMedia("(max-width: 720px)").matches || "ontouchstart" in window;
 }
-
 function syncMobileNav(panelName) {
-  mobileNavButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.panelTarget === panelName);
-  });
+  mobileNavButtons.forEach((button) => button.classList.toggle("active", button.dataset.panelTarget === panelName));
 }
-
 function syncMobileNavToScroll() {
   if (!isMobileLike()) return;
   const containerRect = mobileSections.getBoundingClientRect();
@@ -1113,11 +1016,31 @@ function syncMobileNavToScroll() {
   });
   if (closestPanel) syncMobileNav(closestPanel);
 }
-
+function ensureMobileCalendarLanding() {
+  if (!isMobileLike()) return;
+  const target = mobileSections?.querySelector?.('[data-panel-name="calendar-panel"]');
+  if (!target) return;
+  window.requestAnimationFrame(() => {
+    target.scrollIntoView({ behavior: "auto", inline: "start", block: "nearest" });
+    syncMobileNav("calendar-panel");
+  });
+}
 function debounce(callback, wait) {
   let timeoutId;
   return (...args) => {
-    window.clearTimeout(timeoutId);
+    clearTimeout(timeoutId);
     timeoutId = window.setTimeout(() => callback(...args), wait);
   };
+}
+function queueSave() {
+  clearTimeout(saveTimeoutId);
+  saveTimeoutId = window.setTimeout(async () => {
+    writeCurrentEditorToState();
+    await persist();
+    renderCalendar();
+    renderCalendarDayDetail();
+  }, 250);
+}
+function getTasksForDate(dateKey) {
+  return state.tasks.filter((task) => task.assignedDates.includes(dateKey));
 }

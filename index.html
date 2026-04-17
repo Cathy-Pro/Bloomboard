@@ -22,6 +22,7 @@
   </head>
   <body>
     <div class="cursor-aura"></div>
+
     <section id="auth-shell" class="auth-shell">
       <div class="auth-card">
         <p class="eyebrow">Welcome to Lumi!</p>
@@ -43,6 +44,7 @@
         </div>
       </div>
     </section>
+
     <div class="page-shell">
       <header class="hero-card">
         <div class="hero-copy">
@@ -51,7 +53,7 @@
           <p id="hero-greeting" class="hero-greeting">Hello there.</p>
           <p class="hero-message" id="hero-message">Today's quote will appear here.</p>
           <div class="hero-actions hero-actions-wide">
-            <button id="jump-today" class="soft-button soft-button-secondary">Open Today</button>
+            <button id="jump-today" class="soft-button soft-button-secondary" type="button">Open Today</button>
             <div class="account-chip">
               <span id="account-email">Signed out</span>
               <button id="sign-out-button" class="text-button" type="button">Sign Out</button>
@@ -71,37 +73,13 @@
       </header>
 
       <nav class="mobile-nav" aria-label="Mobile sections">
-        <button class="mobile-nav-button active" data-panel-target="calendar-panel" type="button">Calendar</button>
         <button class="mobile-nav-button" data-panel-target="drawer-panel" type="button">Tasks</button>
+        <button class="mobile-nav-button active" data-panel-target="calendar-panel" type="button">Calendar</button>
         <button class="mobile-nav-button" data-panel-target="detail-panel" type="button">Notes</button>
         <button class="mobile-nav-button" data-panel-target="tracker-panel" type="button">Progress</button>
       </nav>
 
       <div id="mobile-sections" class="mobile-sections">
-        <section class="panel calendar-panel mobile-panel" data-panel-name="calendar-panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Calendar</p>
-              <h2 id="month-label">Month</h2>
-            </div>
-            <div class="month-actions">
-              <button id="prev-month" class="icon-button" aria-label="Previous month">&#8592;</button>
-              <button id="next-month" class="icon-button" aria-label="Next month">&#8594;</button>
-            </div>
-          </div>
-          <div class="weekdays">
-            <span>Sun</span>
-            <span>Mon</span>
-            <span>Tue</span>
-            <span>Wed</span>
-            <span>Thu</span>
-            <span>Fri</span>
-            <span>Sat</span>
-          </div>
-          <div id="calendar-grid" class="calendar-grid"></div>
-          <div id="calendar-day-detail" class="calendar-day-detail"></div>
-        </section>
-
         <section class="panel drawer-panel mobile-panel" data-panel-name="drawer-panel">
           <div class="drawer-topbar">
             <div>
@@ -110,7 +88,7 @@
             </div>
             <div class="drawer-controls">
               <input id="task-search" class="soft-input search-input" type="search" placeholder="Search tasks, tags, notes..." />
-              <button id="toggle-drawer" class="soft-button">Hide Drawer</button>
+              <button id="toggle-drawer" class="soft-button" type="button">Hide Drawer</button>
             </div>
           </div>
 
@@ -127,10 +105,34 @@
             </select>
             <input id="task-target-date" class="soft-input" type="date" />
             <textarea id="task-detail" class="soft-input soft-textarea" placeholder="Add details, kind reminders, or links"></textarea>
-            <button id="add-task" class="cta-button small-cta">Add Task</button>
+            <button id="add-task" class="cta-button small-cta" type="button">Add Task</button>
           </div>
 
           <div id="task-drawer" class="task-drawer"></div>
+        </section>
+
+        <section class="panel calendar-panel mobile-panel" data-panel-name="calendar-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Calendar</p>
+              <h2 id="month-label">Month</h2>
+            </div>
+            <div class="month-actions">
+              <button id="prev-month" class="icon-button" aria-label="Previous month" type="button">&#8592;</button>
+              <button id="next-month" class="icon-button" aria-label="Next month" type="button">&#8594;</button>
+            </div>
+          </div>
+          <div class="weekdays">
+            <span>Sun</span>
+            <span>Mon</span>
+            <span>Tue</span>
+            <span>Wed</span>
+            <span>Thu</span>
+            <span>Fri</span>
+            <span>Sat</span>
+          </div>
+          <div id="calendar-grid" class="calendar-grid"></div>
+          <div id="calendar-day-detail" class="calendar-day-detail"></div>
         </section>
 
         <aside class="panel detail-panel mobile-panel" data-panel-name="detail-panel">
@@ -139,20 +141,47 @@
               <p class="eyebrow">Daily Canvas</p>
               <h2 id="selected-date-label">Today</h2>
             </div>
-            <button id="clear-day" class="soft-button soft-button-secondary">Reset Notes</button>
+            <button id="clear-day" class="soft-button soft-button-secondary" type="button">Reset Notes</button>
           </div>
 
-          <p class="canvas-help">A little spark for the day, a soft note to yourself, and whatever you want to keep close.</p>
-          <div class="mood-strip" id="mood-strip"></div>
+          <div class="wellbeing-card">
+            <div class="section-heading compact-heading">
+              <div>
+                <h3>Daily Glow</h3>
+                <p class="canvas-help wellbeing-copy">A gentle check-in for today’s feelings and hydration.</p>
+              </div>
+            </div>
+            <div class="wellbeing-grid">
+              <label class="wellbeing-field" for="mood-range">
+                <span class="wellbeing-label">Today’s mode</span>
+                <div class="wellbeing-current">
+                  <strong id="mood-range-emoji">😐</strong>
+                  <span id="mood-range-value">Neutral</span>
+                </div>
+                <input id="mood-range" class="wellbeing-slider mood-slider" type="range" min="0" max="3" step="1" value="1" />
+                <div class="wellbeing-scale">
+                  <span>😞</span>
+                  <span>😐</span>
+                  <span>😊</span>
+                  <span>🤩</span>
+                </div>
+              </label>
 
-          <label class="input-label" for="entry-title">Today in a phrase</label>
-          <input id="entry-title" class="soft-input" type="text" placeholder="A gentle title for today" />
+              <label class="wellbeing-field" for="hydration-range">
+                <span class="wellbeing-label">Hydration 💧</span>
+                <div class="wellbeing-current">
+                  <strong id="hydration-range-value">💧 50%</strong>
+                </div>
+                <input id="hydration-range" class="wellbeing-slider" type="range" min="0" max="100" step="5" value="50" />
+              </label>
+            </div>
+          </div>
 
           <div class="editor-toolbar">
-            <button class="toolbar-button" data-command="bold"><strong>B</strong></button>
-            <button class="toolbar-button" data-command="italic"><em>I</em></button>
-            <button class="toolbar-button" data-command="insertUnorderedList">&#8226; List</button>
-            <button class="toolbar-button" id="insert-link">Link</button>
+            <button class="toolbar-button" data-command="bold" type="button"><strong>B</strong></button>
+            <button class="toolbar-button" data-command="italic" type="button"><em>I</em></button>
+            <button class="toolbar-button" data-command="insertUnorderedList" type="button">&#8226; List</button>
+            <button class="toolbar-button" id="insert-link" type="button">Link</button>
           </div>
           <div
             id="rich-editor"
@@ -162,38 +191,28 @@
             data-placeholder="Write today's notes, inspiration, reflections, or reminders here."
           ></div>
 
-          <div class="sticker-section">
-            <div class="section-heading compact-heading">
-              <h3>Sticker Mood</h3>
-              <button id="clear-stickers" class="text-button">Clear</button>
-            </div>
-            <div id="sticker-picker" class="sticker-picker"></div>
-            <div id="selected-stickers" class="selected-stickers">No sticker picked for today yet.</div>
-          </div>
-
           <div class="task-drop-zone" id="task-drop-zone">
             <h3>Tasks For This Day</h3>
             <p>Click a date to see its tasks, or drag a task card onto the date in the calendar.</p>
             <div id="day-task-list" class="day-task-list"></div>
           </div>
 
-          <button id="save-entry" class="cta-button">Save Day Notes</button>
+          <button id="save-entry" class="cta-button" type="button">Save Day Notes</button>
         </aside>
-      
 
-      <footer class="panel tracker-panel mobile-panel" data-panel-name="tracker-panel">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Progress Path</p>
-            <h2>Goal trackers for dated tasks</h2>
+        <footer class="panel tracker-panel mobile-panel" data-panel-name="tracker-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Progress Path</p>
+              <h2>Goal trackers for dated tasks</h2>
+            </div>
+            <div class="tracker-summary">
+              <strong id="completion-stat">0</strong>
+              <span id="completion-label">tracked goals</span>
+            </div>
           </div>
-          <div class="tracker-summary">
-            <strong id="completion-stat">0</strong>
-            <span id="completion-label">tracked goals</span>
-          </div>
-        </div>
-        <div id="tracker-items" class="tracker-items"></div>
-      </footer>
+          <div id="tracker-items" class="tracker-items"></div>
+        </footer>
       </div>
     </div>
 
